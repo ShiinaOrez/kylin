@@ -30,8 +30,13 @@ func NewKylin() Kylin {
 	kylin.inputInterceptors = make(map[string]*interceptor.Interceptor)
 	kylin.outputInterceptors = make(map[string]*interceptor.Interceptor)
 	kylin.SetLogger(logger.DefaultLogger{})
+	kylin.GetLogger().Info("Kylin set up logger: DefaultLogger.")
+
 	m := manager.NewManager()
 	kylin.manager = &m
+	kylin.manager.SetLogger(kylin.logger)
+	kylin.GetLogger().Info("Kylin set up manager.")
+
 	kylin.resultCh = make(chan result.Result, 1)
 	return kylin
 }
@@ -66,9 +71,11 @@ func (kylin *Kylin) SetLogger(l logger.Logger) error {
 }
 
 func (kylin *Kylin) GetLogger() logger.Logger {
-	kylin.once.Do(func() {
-		kylin.SetLogger(logger.DefaultLogger{})
-	})
+	if kylin.logger == nil {
+		kylin.once.Do(func() {
+			kylin.SetLogger(logger.DefaultLogger{})
+		})
+	}
 	return kylin.logger
 }
 
@@ -77,6 +84,7 @@ func (kylin *Kylin) RegisterCrawler(c *crawler.Crawler) error {
 }
 
 func (kylin *Kylin) StartOn(p param.Param) <-chan result.Result {
+	kylin.GetLogger().Info("Kylin start running...")
 	ctx := p.Resolve()
 	kylin.manager.Dispatch(ctx, kylin.resultCh)
 	return kylin.resultCh
@@ -84,6 +92,7 @@ func (kylin *Kylin) StartOn(p param.Param) <-chan result.Result {
 
 func (kylin *Kylin) Stop() {
 	kylin.safeClose()
+	kylin.GetLogger().Info("Kylin running over")
 }
 
 func (kylin *Kylin) safeClose() {
