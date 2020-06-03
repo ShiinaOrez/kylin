@@ -1,11 +1,15 @@
-package tests
+package main
 
 import (
 	"context"
 	"github.com/ShiinaOrez/kylin"
+	_const "github.com/ShiinaOrez/kylin/const"
 	"github.com/ShiinaOrez/kylin/crawler"
 	"github.com/ShiinaOrez/kylin/interceptor"
 	"github.com/ShiinaOrez/kylin/param"
+	"net/http"
+
+	"github.com/mozillazg/request"
 )
 
 type Interceptor struct {}
@@ -23,7 +27,11 @@ type ImageCrawler struct {
 	crawler.BaseCrawler
 }
 
-func Test_Main() {
+func (ic ImageCrawler) GetID() string {
+	return "Image-Crawler"
+}
+
+func main() {
 	k := kylin.NewKylin()
 	var _ interceptor.Interceptor = &Interceptor{}
 	var namespaceInterceptor interceptor.Interceptor = &Interceptor{}
@@ -31,11 +39,24 @@ func Test_Main() {
 
 	var _ crawler.Crawler = &ImageCrawler{}
 	var imageCrawler crawler.Crawler = &ImageCrawler{}
-	imageCrawler.SetID("image-crawler")
-	imageCrawler.SetProc(func(ctx context.Context) {
-		// main process of crawler
+	imageCrawler.SetProc(func(ctx context.Context, notifyCh *chan int) {
+		c := new(http.Client)
+		req := request.NewRequest(c)
+		resp, err := req.Get("https://github.com")
+		defer resp.Body.Close()
+
+		if err == nil {
+			*notifyCh<- _const.StatusSuccess
+		} else {
+			*notifyCh<- _const.StatusFailed
+		}
+		return
 	})
-	k.RegisterCrawler(&imageCrawler)
+	err := k.RegisterCrawler(&imageCrawler)
+	if err != nil {
+		k.GetLogger().Fatal(err.Error())
+		return
+	}
 
 	p := param.NewJSONParam(`{"name": "Computer Network"}`)
 	ch := k.StartOn(p)
@@ -44,9 +65,9 @@ func Test_Main() {
 	select {
 	case result := <-ch:
 		switch result {
-		case kylin.Success:
+		case _const.Success:
 			k.GetLogger().Info("Success")
-		case kylin.Failed:
+		case _const.Failed:
 			k.GetLogger().Info("Failed")
 		}
 	}

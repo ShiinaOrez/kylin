@@ -7,6 +7,7 @@ import (
 	"github.com/ShiinaOrez/kylin/logger"
 	"github.com/ShiinaOrez/kylin/manager"
 	"github.com/ShiinaOrez/kylin/param"
+	"github.com/ShiinaOrez/kylin/result"
 	"sync"
 )
 
@@ -16,7 +17,7 @@ type Kylin struct {
 	outputInterceptors map[string]*interceptor.Interceptor
 	logger             logger.Logger
 
-	resultCh           chan Result
+	resultCh           chan result.Result
 	once               sync.Once
 }
 
@@ -25,11 +26,18 @@ type KylinConfig struct {
 }
 
 func NewKylin() Kylin {
-	return Kylin{}
+	kylin := Kylin{}
+	kylin.inputInterceptors = make(map[string]*interceptor.Interceptor)
+	kylin.outputInterceptors = make(map[string]*interceptor.Interceptor)
+	kylin.SetLogger(logger.DefaultLogger{})
+	m := manager.NewManager()
+	kylin.manager = &m
+	kylin.resultCh = make(chan result.Result, 1)
+	return kylin
 }
 
 func NewKylinByConfig(conf KylinConfig) Kylin {
-	return Kylin{}
+	return NewKylin()
 }
 
 func (kylin *Kylin) RegisterInputInterceptor(i *interceptor.Interceptor) error {
@@ -68,7 +76,7 @@ func (kylin *Kylin) RegisterCrawler(c *crawler.Crawler) error {
 	return kylin.manager.AddCrawler(c)
 }
 
-func (kylin *Kylin) StartOn(p param.Param) <-chan Result {
+func (kylin *Kylin) StartOn(p param.Param) <-chan result.Result {
 	ctx := p.Resolve()
 	kylin.manager.Dispatch(ctx, kylin.resultCh)
 	return kylin.resultCh

@@ -7,36 +7,29 @@ import (
 )
 
 type Crawler interface {
-	Run(ctx context.Context, group *sync.WaitGroup) error
+	Run(ctx context.Context, notifyCh *chan int, group *sync.WaitGroup)
 	GetID() string
-	SetID(string)
-	SetProc(func(ctx context.Context))
+	SetProc(func(ctx context.Context, notifyCh *chan int))
 }
 
 type BaseCrawler struct {
-	id                 string
 	inputInterceptors  []*interceptor.Interceptor
-	proc               func(ctx context.Context)
+	proc               func(ctx context.Context, notifyCh *chan int)
 	outputInterceptors []*interceptor.Interceptor
 
 }
 
-func (wc BaseCrawler) GetID() string {
-	return wc.id
+func (wc *BaseCrawler) GetID() string {
+	return "Base-Crawler"
 }
 
-func (wc BaseCrawler) SetID(newID string) {
-	wc.id = newID
-	return
-}
-
-func (wc BaseCrawler) SetProc(newProc func(ctx context.Context)) {
+func (wc *BaseCrawler) SetProc(newProc func(ctx context.Context, notify *chan int)) {
 	wc.proc = newProc
 	return
 }
 
-func (wc BaseCrawler) Run(ctx context.Context, group *sync.WaitGroup) error {
-	wc.proc(ctx)
+func (wc *BaseCrawler) Run(ctx context.Context, notifyCh *chan int, group *sync.WaitGroup) {
+	wc.proc(ctx, notifyCh)
 	(*group).Done()
-	return nil
+	return
 }

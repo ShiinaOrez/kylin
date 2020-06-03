@@ -3,9 +3,10 @@ package manager
 import (
 	"context"
 	"errors"
-	"github.com/ShiinaOrez/kylin"
+	_const "github.com/ShiinaOrez/kylin/const"
 	"github.com/ShiinaOrez/kylin/crawler"
 	"github.com/ShiinaOrez/kylin/interceptor"
+	"github.com/ShiinaOrez/kylin/result"
 	"sync"
 )
 
@@ -13,6 +14,7 @@ type Manager struct {
 	inputInterceptors  []*interceptor.Interceptor
 	crawlers           map[string]*crawler.Crawler
 	// outputInterceptors []*interceptor.Interceptor
+	resultHandler      func(map[string]*chan int) (result.Result, error)
 }
 
 func (manager Manager) AddCrawler(c *crawler.Crawler) error {
@@ -25,16 +27,50 @@ func (manager Manager) AddCrawler(c *crawler.Crawler) error {
 	return nil
 }
 
-func (manager Manager) Dispatch(ctx context.Context, resultCh chan kylin.Result) {
+func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result) error {
 	for _, i := range manager.inputInterceptors {
 		ctx = (*i).Run(ctx)
 	}
-	wg := &sync.WaitGroup{}
+	notifyChMap := make(map[string]*chan int)
+	defer func() {
+		for _, ch := range notifyChMap {
+			close(*ch)
+		}
+	}()
+
+	wg := sync.WaitGroup{}
 	for _, c := range manager.crawlers {
+		notifyCh := make(chan int, 1)
+		notifyChMap[(*c).GetID()] = &notifyCh
 		wg.Add(1)
-		go (*c).Run(ctx, wg)
+		go func() {
+			(*c).Run(ctx, &notifyCh, &wg)
+		}()
 	}
-	wg.Done()
-	resultCh<- kylin.Success
-	return
+	wg.Wait()
+	result, err := manager.resultHandler(notifyChMap)
+
+	if err != nil {
+		return err
+	}
+	resultCh<- result
+	return nil
+}
+
+func DefaultResultHandler(notifyChMap map[string]*chan int) (result.Result, error) {
+	r := _const.Success
+	for _, ch := range notifyChMap {
+		result := <-*ch
+		if result == _const.StatusFailed {
+			r = _const.Failed
+		}
+	}
+	return r, nil
+}
+
+func NewManager() Manager {
+	manager := Manager{}
+	manager.crawlers = make(map[string]*crawler.Crawler)
+	manager.resultHandler = DefaultResultHandler
+	return manager
 }
