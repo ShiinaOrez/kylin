@@ -2,6 +2,7 @@ package kylin
 
 import (
 	"errors"
+	_const "github.com/ShiinaOrez/kylin/const"
 	"github.com/ShiinaOrez/kylin/crawler"
 	"github.com/ShiinaOrez/kylin/interceptor"
 	"github.com/ShiinaOrez/kylin/logger"
@@ -86,7 +87,11 @@ func (kylin *Kylin) RegisterCrawler(c *crawler.Crawler) error {
 func (kylin *Kylin) StartOn(p param.Param) <-chan result.Result {
 	kylin.GetLogger().Info("Kylin start running...")
 	ctx := p.Resolve()
-	kylin.manager.Dispatch(ctx, kylin.resultCh)
+	err := kylin.manager.Dispatch(ctx, kylin.resultCh)
+	if err != nil {
+		kylin.GetLogger().Warning("Call manager Dispatch method error, reason: "+err.Error())
+		kylin.resultCh<- _const.Failed
+	}
 	return kylin.resultCh
 }
 

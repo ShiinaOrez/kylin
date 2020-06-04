@@ -12,15 +12,17 @@ import (
 	"github.com/mozillazg/request"
 )
 
-type Interceptor struct {}
+type NameInterceptor struct {}
 
-func(i *Interceptor) Run(ctx context.Context) context.Context {
-	ctx = context.WithValue(ctx, "namespace", "Test")
+func(i *NameInterceptor) Run(ctx context.Context) context.Context {
+	if name := ctx.Value("name").(string); name == "" {
+		ctx = context.WithValue(ctx, "break", i.GetID())
+	}
 	return ctx
 }
 
-func (i *Interceptor) GetID() string {
-	return "namespace"
+func (i *NameInterceptor) GetID() string {
+	return "name-interceptor"
 }
 
 type ImageCrawler struct {
@@ -28,37 +30,27 @@ type ImageCrawler struct {
 }
 
 func (ic ImageCrawler) GetID() string {
-	return "Image-Crawler"
+	return "ArtStation-Crawler"
 }
 
 func main() {
-	k := kylin.NewKylin()
-	var _ interceptor.Interceptor = &Interceptor{}
-	var namespaceInterceptor interceptor.Interceptor = &Interceptor{}
-	k.RegisterInputInterceptor(&namespaceInterceptor)
+	var (
+		k            kylin.Kylin             = kylin.NewKylin()
+		i            interceptor.Interceptor = &NameInterceptor{}
+		imageCrawler crawler.Crawler         = &ImageCrawler{}
+	)
 
-	var _ crawler.Crawler = &ImageCrawler{}
-	var imageCrawler crawler.Crawler = &ImageCrawler{}
-	imageCrawler.SetProc(func(ctx context.Context, notifyCh *chan int) {
-		c := new(http.Client)
-		req := request.NewRequest(c)
-		resp, err := req.Get("https://github.com")
-		defer resp.Body.Close()
+	k.RegisterInputInterceptor(&i)
+	imageCrawler.SetProc(artStationCrawler)
 
-		if err == nil {
-			*notifyCh<- _const.StatusSuccess
-		} else {
-			*notifyCh<- _const.StatusFailed
-		}
-		return
-	})
 	err := k.RegisterCrawler(&imageCrawler)
 	if err != nil {
 		k.GetLogger().Fatal(err.Error())
 		return
 	}
 
-	p := param.NewJSONParam(`{"name": "Computer Network"}`)
+	p := param.NewJSONParam(`{"content": {"name": "timbougami"}}`)
+
 	ch := k.StartOn(p)
 	defer k.Stop()
 
@@ -71,4 +63,20 @@ func main() {
 			k.GetLogger().Info("Failed")
 		}
 	}
+}
+
+func artStationCrawler(ctx context.Context, notifyCh *chan int) {
+	c := new(http.Client)
+	req := request.NewRequest(c)
+
+	artistName := ctx.Value("name")
+	resp, err := req.Get("https://www.artstation.com/"+artistName.(string))
+	defer resp.Body.Close()
+
+	if err == nil {
+		*notifyCh<- _const.StatusSuccess
+	} else {
+		*notifyCh<- _const.StatusFailed
+	}
+	return
 }

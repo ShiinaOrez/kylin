@@ -48,6 +48,10 @@ func (manager *Manager) GetLogger() logger2.Logger {
 func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result) error {
 	for _, i := range manager.inputInterceptors {
 		ctx = (*i).Run(ctx)
+		if interceptorID := ctx.Value("break").(string); interceptorID != "" {
+			manager.GetLogger().Warning("Interceptor trigger break! InterceptorID: "+interceptorID)
+			return errors.New("Interceptor trigger break ")
+		}
 	}
 	notifyChMap := make(map[string]*chan int)
 	defer func() {
