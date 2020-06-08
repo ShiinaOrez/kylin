@@ -7,7 +7,9 @@ import (
 	"github.com/ShiinaOrez/kylin/crawler"
 	"github.com/ShiinaOrez/kylin/interceptor"
 	"github.com/ShiinaOrez/kylin/param"
+	"github.com/ShiinaOrez/kylin/result"
 	"net/http"
+	"os"
 
 	"github.com/mozillazg/request"
 )
@@ -33,6 +35,12 @@ func (ic ImageCrawler) GetID() string {
 	return "ArtStation-Crawler"
 }
 
+type ReturnData struct {}
+
+func (d ReturnData) Format() string {
+	return "result"
+}
+
 func main() {
 	var (
 		k            kylin.Kylin             = kylin.NewKylin()
@@ -40,16 +48,20 @@ func main() {
 		imageCrawler crawler.Crawler         = &ImageCrawler{}
 	)
 
-	k.RegisterInputInterceptor(&i)
-	imageCrawler.SetProc(artStationCrawler)
-
-	err := k.RegisterCrawler(&imageCrawler)
+	err := k.AddInputInterceptor(&i, "tail")
 	if err != nil {
 		k.GetLogger().Fatal(err.Error())
 		return
 	}
+	imageCrawler.SetProc(artStationCrawler)
 
-	p := param.NewJSONParam(`{"content": {"name": "timbougami"}}`)
+	err = k.RegisterCrawler(&imageCrawler)
+	if err != nil {
+		k.GetLogger().Fatal(err.Error())
+		return
+	}
+	wd, _ := os.Getwd()
+	p := param.NewJSONParam(`{"content": {"name": "fine", "path": "` + wd + `"}}`)
 
 	ch := k.StartOn(p)
 	defer k.Stop()
@@ -65,7 +77,7 @@ func main() {
 	}
 }
 
-func artStationCrawler(ctx context.Context, notifyCh *chan int) {
+func artStationCrawler(ctx context.Context, notifyCh *chan int) result.Data {
 	c := new(http.Client)
 	req := request.NewRequest(c)
 
@@ -78,5 +90,7 @@ func artStationCrawler(ctx context.Context, notifyCh *chan int) {
 	} else {
 		*notifyCh<- _const.StatusFailed
 	}
-	return
+
+	var d result.Data = ReturnData{}
+	return d
 }

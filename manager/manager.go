@@ -21,6 +21,17 @@ type Manager struct {
 	once               sync.Once
 }
 
+func (manager *Manager) AddInputInterceptor(i *interceptor.Interceptor, mode string) error {
+	if mode == "tail" {
+		manager.inputInterceptors = append(manager.inputInterceptors, i)
+	} else if mode == "head" {
+		manager.inputInterceptors = append([]*interceptor.Interceptor{i}, manager.inputInterceptors...)
+	} else {
+		return errors.New("Add input interceptor mode invalid.")
+	}
+	return nil
+}
+
 func (manager *Manager) AddCrawler(c *crawler.Crawler) error {
 	id := (*c).GetID()
 	if _, ok := manager.crawlers[id]; !ok {
@@ -45,15 +56,19 @@ func (manager *Manager) GetLogger() logger2.Logger {
 	return manager.logger
 }
 
-func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result) error {
+func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result) (map[string]result.Data, error) {
 	for _, i := range manager.inputInterceptors {
 		ctx = (*i).Run(ctx)
 		if interceptorID := ctx.Value("break").(string); interceptorID != "" {
 			manager.GetLogger().Warning("Interceptor trigger break! InterceptorID: "+interceptorID)
-			return errors.New("Interceptor trigger break ")
+			return nil, errors.New("Interceptor trigger break ")
 		}
 	}
 	notifyChMap := make(map[string]*chan int)
+	dataMap := result.DataMap{
+		Lock: new(sync.Mutex),
+		Map:  make(map[string]result.Data),
+	}
 	defer func() {
 		for _, ch := range notifyChMap {
 			close(*ch)
@@ -67,7 +82,7 @@ func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result
 		wg.Add(1)
 		manager.GetLogger().Info("Crawler ID: "+id+" start running...")
 		go func() {
-			(*c).Run(ctx, &notifyCh, &wg)
+			(*c).Run(ctx, &notifyCh, &wg, &dataMap)
 		}()
 	}
 	wg.Wait()
@@ -75,10 +90,10 @@ func (manager Manager) Dispatch(ctx context.Context, resultCh chan result.Result
 	result, err := manager.resultHandler(notifyChMap)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resultCh<- result
-	return nil
+	return dataMap.Map, nil
 }
 
 func (manager *Manager) SetResultHandler(f func(notifyChMap map[string]*chan int) (result.Result, error)) {
