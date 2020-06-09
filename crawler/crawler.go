@@ -14,6 +14,7 @@ type Crawler interface {
 }
 
 type BaseCrawler struct {
+	ID                 string
 	inputInterceptors  []*interceptor.Interceptor
 	proc               func(ctx context.Context, notifyCh *chan int) result.Data
 	outputInterceptors []*interceptor.Interceptor
@@ -21,7 +22,7 @@ type BaseCrawler struct {
 }
 
 func (wc *BaseCrawler) GetID() string {
-	return "Base-Crawler"
+	return wc.ID
 }
 
 func (wc *BaseCrawler) SetProc(newProc func(ctx context.Context, notify *chan int) result.Data) {

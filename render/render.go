@@ -2,28 +2,16 @@ package render
 
 import (
 	"context"
-	logger2 "github.com/ShiinaOrez/kylin/logger"
-	"github.com/ShiinaOrez/kylin/param"
 	"github.com/ShiinaOrez/kylin/result"
 )
 
-type Render struct {
-	dataMap     map[string]result.Data
-	logger      logger2.Logger
+type Render interface {
+	Do(ctx context.Context, data result.Data) error
 }
 
-func NewRender(dataMap map[string]result.Data) Render {
-	return Render{dataMap:dataMap}
-}
+type FileRender struct {}
 
-func (r *Render) Do(p param.Param, way func(ctx context.Context, content string) error ) error {
-	ctx := p.Resolve()
-	for k, v := range r.dataMap {
-		ctx = context.WithValue(ctx, "id", k)
-		err := way(ctx, v.Format())
-		if err != nil {
-			return err
-		}
-	}
+func (r FileRender) Do(ctx context.Context, data result.Data) error {
+	SaveAsFile(ctx, data.Format())
 	return nil
 }

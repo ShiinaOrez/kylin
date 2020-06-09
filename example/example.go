@@ -6,7 +6,9 @@ import (
 	_const "github.com/ShiinaOrez/kylin/const"
 	"github.com/ShiinaOrez/kylin/crawler"
 	"github.com/ShiinaOrez/kylin/interceptor"
+	logger2 "github.com/ShiinaOrez/kylin/logger"
 	"github.com/ShiinaOrez/kylin/param"
+	"github.com/ShiinaOrez/kylin/render"
 	"github.com/ShiinaOrez/kylin/result"
 	"net/http"
 	"os"
@@ -27,14 +29,6 @@ func (i *NameInterceptor) GetID() string {
 	return "name-interceptor"
 }
 
-type ImageCrawler struct {
-	crawler.BaseCrawler
-}
-
-func (ic ImageCrawler) GetID() string {
-	return "ArtStation-Crawler"
-}
-
 type ReturnData struct {}
 
 func (d ReturnData) Format() string {
@@ -45,19 +39,19 @@ func main() {
 	var (
 		k            kylin.Kylin             = kylin.NewKylin()
 		i            interceptor.Interceptor = &NameInterceptor{}
-		imageCrawler crawler.Crawler         = &ImageCrawler{}
+		imageCrawler crawler.Crawler         = &crawler.BaseCrawler{ID:"ArtStation-Crawler"}
 	)
 
 	err := k.AddInputInterceptor(&i, "tail")
 	if err != nil {
-		k.GetLogger().Fatal(err.Error())
+		logger2.GetLogger(nil).Fatal(err.Error())
 		return
 	}
 	imageCrawler.SetProc(artStationCrawler)
 
-	err = k.RegisterCrawler(&imageCrawler)
+	err = k.RegisterCrawlerWithRender(&imageCrawler, render.FileRender{})
 	if err != nil {
-		k.GetLogger().Fatal(err.Error())
+		logger2.GetLogger(nil).Fatal(err.Error())
 		return
 	}
 	wd, _ := os.Getwd()
@@ -70,9 +64,9 @@ func main() {
 	case result := <-ch:
 		switch result {
 		case _const.Success:
-			k.GetLogger().Info("Success")
+			logger2.GetLogger(nil).Info("Success")
 		case _const.Failed:
-			k.GetLogger().Info("Failed")
+			logger2.GetLogger(nil).Info("Failed")
 		}
 	}
 }

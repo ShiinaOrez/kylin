@@ -1,12 +1,30 @@
 package logger
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 type Logger interface {
 	Info(string)
 	Warning(string)
 	Debug(string)
 	Fatal(string)
+}
+
+func GetLogger(ctx context.Context) Logger {
+	if ctx == nil {
+		return DefaultLogger{}
+	}
+	i := ctx.Value("kylin-logger")
+	if i == nil {
+		return DefaultLogger{}
+	}
+	if l, ok := ctx.Value("kylin-logger").(Logger); !ok {
+		return DefaultLogger{}
+	} else {
+		return l
+	}
 }
 
 type DefaultLogger struct {}
